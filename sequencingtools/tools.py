@@ -3,14 +3,85 @@ Created on Jan 7, 2016
 
 @author: dulupinar
 '''
+from __future__ import print_function
 import numpy as np
 from sets import Set
+from operator import itemgetter
+from sys import stdout
 
-DEFAULT_BLOCK_SIZE = 4
-DEFAULT_ERRORS     = 1                 #errors per Read
+
+DEFAULT_ERRORS     = 2                 #errors per Read
 DEFAULT_NUM_BLOCKS = DEFAULT_ERRORS +1 #kmer + 1
-DEFAULT_COVERAGE = 5
+DEFAULT_COVERAGE   = 5
 
+class STR(set):
+    def __init__(self):
+        self.header = ">STR"
+        set.__init__(self)
+        
+    def __str__(self):
+        return_string = self.header + "\n"
+        return return_string
+    
+class CNV(set):
+    def __init__(self):
+        self.header = ">CNV"
+        set.__init__(self)
+    
+    def __str__(self):
+        return_string = self.header + "\n"
+        return return_string
+    
+class ALU(set):
+    def __init__(self):
+        self.header = ">ALU"
+        set.__init__(self)
+        
+    def __str__(self):
+        return_string = self.header + "\n"
+        return return_string 
+class INV(set):
+    def __init__(self):
+        self.header = ">INV"
+        set.__init__(self)
+        
+    def __str__(self):
+        return_string = self.header + "\n"
+        return return_string
+        
+class SNP(set):
+    def __init__(self):
+        self.header = ">SNP"
+        set.__init__(self)
+    
+    def __str__(self):
+        return_string = self.header + "\n"
+        for tup in sorted(self,key=itemgetter(2)):
+            return_string+=tup[0] + "," + tup[1] + "," + str(tup[2]) + "\n"
+        return return_string
+
+class INS(set):
+    def __init__(self):
+        self.header = ">INS"
+        set.__init__(self)
+    
+    def __str__(self):
+        return_string = self.header + "\n"
+        for tup in sorted(self,key=itemgetter(1)):
+            return_string+=tup[0] + "," + str(tup[1]) + "\n"
+        return return_string
+    
+class DEL(set):
+    def __init__(self):
+        self.header = ">DEL"
+        set.__init__(self)
+    
+    def __str__(self):
+        return_string = self.header + "\n"
+        for tup in sorted(self,key=itemgetter(1)):
+            return_string+=tup[0] + "," + str(tup[1]) + "\n"
+        return return_string
+    
 class Variation:
     'SNP sites'
     def __init__(self,pos,variation):
@@ -47,12 +118,24 @@ class ReferenceSequence:
             #the filename just becomes the refRead makes debugging easier
             self.refRead = filename 
         else:
-            self.refRead = readRef(filename)
+            fileContent = readRef(filename)
+            self.refRead = fileContent[0]
+            self.name = fileContent[1]
+        
+        #attributes
+        self.STR = STR()
+        self.CNV = CNV()
+        self.ALU = ALU()
+        self.INV = INV()
+        self.insertions = INS()
+        self.deletions = DEL()
+        self.SNP = SNP()
+        self.attributes = [self.name,self.STR,self.CNV,self.ALU,self.INV,self.insertions,self.deletions,self.SNP]
+        
+        #helper
         self.variations = dict()
         self.coverage = np.zeros(len(self.refRead),dtype=np.int)
-        self.SNP = Set()
-        self.deletions = np.zeros(len(self.refRead),dtype=np.int)
-        self.INDEL = Set()
+
         
     def addVariations(self,readVariations):
         for variation in readVariations:
@@ -63,8 +146,8 @@ class ReferenceSequence:
     
     def determineSNP(self,coverage = DEFAULT_COVERAGE):
         for key in self.variations:
-            if len(self.variations[key]) > coverage:
-                snp = max(self.variations[key],key=self.variations[key].count)
+            snp = max(self.variations[key],key=self.variations[key].count)
+            if self.variations[key].count(snp) >= coverage:
                 self.SNP.add((self.refRead[key],snp,key))
                 
     def findMatch(self,readObj,kmerMap,numBlocks=DEFAULT_NUM_BLOCKS,reverse=False):
@@ -91,14 +174,18 @@ class ReferenceSequence:
         
         return False
     
-    def findInDel(self,readObj,start_ref,end_ref):
+    def findInDels(self,readObj,start_ref,end_ref):
+        self.findInsertions(readObj,start_ref,end_ref)
+        self.findDeletions(readObj,start_ref,end_ref)
+        
+    def findDeletions(self,readObj,start_ref,end_ref):
         read = readObj.read
         refRead = self.refRead[start_ref:end_ref]
         'currently for deletions'
         last_match_index = 0
-    
+
         while last_match_index <= len(refRead)-len(read):
-            deletion = []
+            deletion = ""
             i = 0
             j = last_match_index
             matches = 0
@@ -119,38 +206,128 @@ class ReferenceSequence:
                     
                 else:
                     if match_previous:
-                        gap_count+=1
-                        gap_pos = j
+                        if refRead[j] == read[i-1]:
+                            match_previous = True
+                        else:
+                            gap_count+=1
+                            gap_pos = j
+                            match_previous = False
                         
                     if gap_count > 0:
                         #we are in a gap
                         #only add as deletion after we have started matching the read to reference
                         gap_size+=1
-                        deletion.append(refRead[j])
+                        deletion+=refRead[j]
                     j+=1 #move j pointer but i stays same
-                    match_previous = False
+
             
             if matches == len(read) and gap_count > 0 and gap_count <=max_gap_count:
+                check = gap_pos + gap_size -1
+                if len(read) == last_match_index - check:
+                    #this is ugly but need to skip these
+                    continue
                 start = start_ref+gap_pos
-                self.updateDeletions(start,start + gap_size)
+                self.updateDeletions(start,deletion)
+                #self.updateCoverage(start_ref, end_ref)
                 return True
-            
-        return False #should return false if no indels found
+
+        return False
     
-    def printInfo(self):
+    def findInsertions(self,readObj,start_ref,end_ref):
+        read = readObj.read
+        refRead = self.refRead[start_ref:end_ref]
+        'currently for Insertions'
+        last_match_index = 0
+
+        while last_match_index <= len(refRead)-len(read):
+            insertion = ""
+            i = 0
+            j = last_match_index
+            matches = 0
+            gap_size = 0
+            gap_count = 0
+            max_gap_count = 1
+            max_gap_size = 20
+            match_previous = False
+            gap_pos = None
+            
+            while gap_size <= max_gap_size and gap_count <= max_gap_count and i < len(read) and j < len(refRead):
+                if refRead[j] == read[i]:
+                    j+=1
+                    i+=1
+                    matches+=1
+                    match_previous = True
+                    last_match_index = j
+                    
+                else:
+                    if match_previous:
+                        if refRead[j] == read[i-1]:
+                            match_previous = True
+                        else:
+                            gap_count+=1
+                            gap_pos = j
+                            match_previous = False
+                        
+                    if gap_count > 0:
+                        #we are in a gap
+                        #only add as deletion after we have started matching the read to reference
+                        gap_size+=1
+                        insertion+=read[i]
+                    i+=1 #move j pointer but i stays same
+
+            
+            if matches == len(read) - gap_size and gap_count > 0 and gap_count <=max_gap_count:
+                check = gap_pos + gap_size -1
+                if len(read) == last_match_index - check:
+                    #this is ugly but need to skip these
+                    continue
+                start = start_ref+gap_pos
+                self.updateInsertions(start,insertion)
+                return True
+
+        return False
+    
+    def printInfo(self,filestream=stdout):
         self.determineSNP()
-        self.determineDeletions()
-        print self.SNP
-        print self.INDEL
+        self.determineInDels()
+        for attribute in self.attributes:
+            print(attribute,file=filestream,end="")
+
         
     def updateCoverage(self,start,end):
         for i in range(start,end):
             self.coverage[i]+=1
 
-    def updateDeletions(self,start,end):
-        for i in range(start,end):
-            self.deletions[i]+=1
+    def updateDeletions(self,start,deletion):
+        self.deletions.add((deletion,start))
+            
+    def updateInsertions(self,start,insertion):
+        self.insertions.add((insertion,start))
     
+    def determineInDels(self):
+        self.INDEL = self.deletions | self.insertions
+        remove = Set()
+        for dely in self.deletions:
+            for insy in self.insertions:
+                dist = abs(dely[1] - insy[1])
+                max_len = max(len(dely[0]),len(insy[0]))
+                if dist < max_len:
+                    if len(dely[0])>len(insy[0]):
+
+                        remove.add(dely)
+                    else:
+                        remove.add(insy)
+ 
+        
+        for tup in remove:
+            if tup in self.deletions:
+                print("WARNING we are removing dely " + str(tup))
+                self.deletions.remove(tup)
+            if tup in self.insertions:
+                print("WARNING we are removing insy " + str(tup))
+                self.insertions.remove(tup)
+
+               
     def determineDeletions(self):
         deletion = ""
         
@@ -202,7 +379,7 @@ def readRef(refFilename):
             raise Exception("Did not find > in first line are you sure this is reference file")
         for line in f:
             refRead += line.strip()
-    return refRead
+    return refRead,descriptorLine
 
 def readRead(refFilename):
     paired_end_reads = []
@@ -222,64 +399,4 @@ def readRead(refFilename):
             
     return paired_end_reads
 
-def findInDel(refRead,read):
-    'currently for deletions'
-    last_match_index = 0
-    
-    while last_match_index <= len(refRead)-len(read):
-        deletion = []
-        i = 0
-        j = last_match_index
-        matches = 0
-        gap_size = 0
-        gap_count = 0
-        gap_pos = None #this is the first posision deleted from ref
-        max_gap_count = 1
-        max_gap_size = 20
-        match_previous = False
-        
-        while gap_size <= max_gap_size and gap_count <= max_gap_count and i < len(read) and j < len(refRead):
-            if refRead[j] == read[i]:
-                j+=1
-                i+=1
-                matches+=1
-                match_previous = True
-                last_match_index = j
-                
-            else:
-                if match_previous:
-                    gap_count+=1
-                    gap_pos = j
-                if gap_count > 0:
-                    #we are in a gap
-                    #only add as deletion after we have started matching the read to reference
-                    gap_size+=1
-                    deletion.append(refRead[j])
-                j+=1 #move j pointer but i stays same
-                match_previous = False
-        
-        if matches == len(read):
-            print deletion
-            return deletion
 
-         
-def main():
-    read    =    "TTACCAAGTCGATGATTGTC"  # took out ACCTTACCAAGTCCAACGATGATTGTCGCGCT
-    refRead = "TTAppppppppppppppppppppppppppppppppppppppppppppACCTTACCAAGTCCAACGATGATTGTCGCGCT"
-    read    =    "TTACCAAGTGATGATTGTCGCGCT"  # took out ACCTTACCAAGTCCAACGATGATTGTCGCGCT
-    findInDel(refRead,read)
-    
-'''
-def main():
-    refRead = "ACCTTACCAAGTCCAACGATGATTGTCGCGCTGTCGGTAACGAGGAAAGAATCAGAATGCTAAGAGAATACCGAACCTAC"
-    readLength = 12
-    read = "TCCAAGGATGGT"
-    numMerBlocks = 3
-    
-    a = generateKmerMap(refRead,len(read),numMerBlocks)
-    refSeq = ReferenceSequence(refRead)
-    refSeq.findMatch(read,a)
-    refSeq.printInfo()
-'''
-if __name__ == "__main__":
-    main()

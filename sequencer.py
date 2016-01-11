@@ -5,43 +5,28 @@ Created on Jan 8, 2016
 '''
 import sequencingtools.tools as tools
 
-refReadFile = "./practice_W_1/ref_practice_W_1_chr_1.txt"
-read = "CGTATTAGGAAAACGGTGTAAGGAGTAAAGCCGGTAGGGGAGTCTGACCG"
-readFile = "./practice_W_1/reads_practice_W_1_chr_1.txt"
+refReadFile = "./forcredit/hw1_W_2/ref_hw1_W_2_chr_1.txt"
+readFile = "./forcredit/hw1_W_2/reads_hw1_W_2_chr_1.txt"
+
+#refReadFile = "./practice_W_1/ref_practice_W_1_chr_1.txt"
+#readFile = "./practice_W_1/reads_practice_W_1_chr_1.txt"
+
+output = open("./forcredit/output.txt",'w')  
 unmatchedReads = tools.readRead(readFile)
 
 refSeq = tools.ReferenceSequence(refReadFile)
-a = tools.generateKmerMap(refSeq.refRead,len(read))
+a = tools.generateKmerMap(refSeq.refRead,len(unmatchedReads[0].read))
 
 for read in unmatchedReads:
     if refSeq.findMatch(read,a) == False:
-        #print "trying reverse"
-        if refSeq.findMatch(read,a,reverse = True):
-            #print "found with reverse"
-            pass
-        else:
-            #print "did not find chita choot"
+        if refSeq.findMatch(read,a,reverse = True) == False:
             if read.pairedRead.matchRangeInRef is not None:
+                #The pairedEnd had a match So lets check within a close distance
                 start = read.pairedRead.matchRangeInRef[1]+50
-                if refSeq.findInDel(read,start,start + 400):
-                    print "found deletion"
-                    
-                else:
-                    end = read.pairedRead.matchRangeInRef[1]
-                    refSeq.findInDel(read,end - 400,end)
-refSeq.printInfo()
-
-'''
-def main():
-    refReadFile = "./practice_W_1/ref_practice_W_1_chr_1.txt"
-    read = "CGTATTAGGAAAACGGTGTAAGGAGTAAAGCCGGTAGGGGAGTCTGACCG"
-    
-    refSeq = tools.ReferenceSequence(refReadFile)
-    a = tools.generateKmerMap(refSeq.refRead,len(read))
-    
-    refSeq.findMatch(read,a)
-    refSeq.printInfo()
-
-if __name__ == "__main__":
-    main()
-'''
+                refSeq.findInDels(read,start,start + 400)
+            else:
+                #the pairedEnd did not find a match so lets check over the whole distance
+                refSeq.findInDels(read,0,len(refSeq.refRead))
+                pass
+          
+refSeq.printInfo(filestream=output)
