@@ -5,7 +5,9 @@ Created on Jan 8, 2016
 '''
 import matplotlib.pyplot as plt
 import unittest
+import difflib
 import sequencingtools.tools as tools
+import sys
 class TestSequencer1(unittest.TestCase):
     
     def test_del1(self):
@@ -111,8 +113,46 @@ class TestSequencer8(unittest.TestCase):
         val = refSeq.findInDel(unmatchedReads[5220],0,len(refSeq.refRead))
         print val
         refSeq.printInfo()
-              
+        
+class TestSequencerRegress(unittest.TestCase):   
+    def test_del(self):
+            refReadFile = "../HW1/practice_W_1/ref_practice_W_1_chr_1.txt"
+            readFile = "../HW1/practice_W_1/reads_practice_W_1_chr_1.txt"
+            gen_file = "../HW1/forcredit/testcase_gen.txt"
+            solution_file = "../HW1/forcredit/testcase.txt"
+            output = open(gen_file,'w')  
+            unmatchedReads = tools.readRead(readFile)
+            
+            refSeq = tools.ReferenceSequence(refReadFile)
+            a = tools.generateKmerMap(refSeq.refRead,len(unmatchedReads[0].read))
+            
+            for read in unmatchedReads:
+                if refSeq.findMatch(read,a) == False:
+                    if refSeq.findMatch(read,a,reverse = True) == False:
+                        if read.pairedRead.matchRangeInRef is not None:
+                            #The pairedEnd had a match So lets check within a close distance
+                            start = read.pairedRead.matchRangeInRef[1]+50
+                            refSeq.findInDels(read,start,start + 400)
+                        else:
+                            #the pairedEnd did not find a match so lets check over the whole distance
+                            #refSeq.findInDels(read,0,len(refSeq.refRead))
+                            pass
+                      
+            refSeq.printInfo(filestream=output)
+            output.close()
+            
+            with open(solution_file,'r') as sol:
+                with open(gen_file,'r') as gen:
+                    diff = difflib.unified_diff(sol.readlines(), gen.readlines(), fromfile=solution_file, tofile=gen_file)
+            
+            Fail = False
+            for line in diff:
+                Fail = True
+                sys.stdout.write(line)
+                
+            self.assertEqual(Fail,False)
+                
 if __name__ == "__main__":
 
-    suite = unittest.TestLoader().loadTestsFromTestCase(TestSequencer9)
+    suite = unittest.TestLoader().loadTestsFromTestCase(TestSequencerRegress)
     unittest.TextTestRunner().run(suite)

@@ -5,14 +5,23 @@ Created on Jan 7, 2016
 '''
 from __future__ import print_function
 import numpy as np
+from collections import defaultdict
+import cPickle as pickle
 from sets import Set
 from operator import itemgetter
 from sys import stdout
+import logging as logger
+import os
+import sys
+#from guppy import hpy
+#hp = hpy()
+
+logger.basicConfig(level=logger.WARNING,format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
 
 
-DEFAULT_ERRORS     = 2                 #errors per Read
+DEFAULT_ERRORS     = 3                 #errors per Read
 DEFAULT_NUM_BLOCKS = DEFAULT_ERRORS +1 #kmer + 1
-DEFAULT_COVERAGE   = 5
+DEFAULT_COVERAGE   = 10
 
 class STR(set):
     def __init__(self):
@@ -164,7 +173,7 @@ class ReferenceSequence:
                 for posInRef in kmerMap[block]:
                     #verify around each site where the block matches
                     startRef = -explore_i*blockSize + posInRef
-                    endRef   = min(self.refRead,startRef+len(read)) #make better need to get read of len and min operators
+                    endRef   = min(len(self.refRead),startRef+len(read)) #make better need to get read of len and min operators
                     variations = diffPlaces(self.refRead,read,startRef,endRef)
                     if len(variations) <= numBlocks-1:
                         self.addVariations(variations)
@@ -183,11 +192,14 @@ class ReferenceSequence:
         refRead = self.refRead[start_ref:end_ref]
         'currently for deletions'
         last_match_index = 0
+        p = False
 
         while last_match_index <= len(refRead)-len(read):
+            logger.info("last match: {0}, length of refRead {1}, length of read {2}".format(str(last_match_index),str(len(refRead)),str(len(read))))
             deletion = ""
             i = 0
             j = last_match_index
+            last_match_index+=1
             matches = 0
             gap_size = 0
             gap_count = 0
@@ -197,6 +209,7 @@ class ReferenceSequence:
             gap_pos = None
             
             while gap_size <= max_gap_size and gap_count <= max_gap_count and i < len(read) and j < len(refRead):
+                logger.info("gap size {0}, gap count {1}, i {2}, j{3}".format(str(gap_size), str(gap_count), str(i), str(j)))
                 if refRead[j] == read[i]:
                     j+=1
                     i+=1
@@ -250,6 +263,7 @@ class ReferenceSequence:
             max_gap_size = 20
             match_previous = False
             gap_pos = None
+            last_match_index+=1
             
             while gap_size <= max_gap_size and gap_count <= max_gap_count and i < len(read) and j < len(refRead):
                 if refRead[j] == read[i]:
@@ -318,7 +332,6 @@ class ReferenceSequence:
                     else:
                         remove.add(insy)
  
-        
         for tup in remove:
             if tup in self.deletions:
                 print("WARNING we are removing dely " + str(tup))
@@ -357,18 +370,31 @@ def generateKmerMap(refRead, readLength, numMerBlocks=DEFAULT_NUM_BLOCKS):
     @param numMerBlocks is the number chunks we want to divide the reads into; kmer + 1
     '''
     refReadLengh = len(refRead)
-    chunkSize = min(readLength,readLength/numMerBlocks) #the size of each kmer block
-    kmerMap = dict()
-    for i in range(refReadLengh-chunkSize):
-        start = i
-        end = min(len(refRead),start + chunkSize) #just ignore if it is not correct size
-        block = refRead[start:end]
-        if kmerMap.has_key(block):
+        
+    pickle_file = "kmerMap_{0}_{1}.p".format(numMerBlocks,refReadLengh)
+    if os.path.isfile(pickle_file):
+        logger.warning("reading in KmerMap from " + pickle_file)
+        return pickle.load(open(pickle_file,"rb"))
+    else:
+        logger.warning("generating Map")
+        chunkSize = min(readLength,readLength/numMerBlocks) #the size of each kmer block
+        #hp.setrelheap()
+        kmerMap = defaultdict(list)
+        rangeR = refReadLengh-chunkSize
+
+        for i in range(rangeR):
+            if i % (rangeR/15) == 0:
+                logger.warning("generated {0}% of the kmerMap with size {1}".format(str(100*i/float(rangeR)),str(sys.getsizeof(kmerMap)))) 
+                #h = hp.heap()
+                #print(h)
+            start = i
+            end = start + chunkSize #just ignore if it is not correct size
+            block = refRead[start:end]
             kmerMap[block].append(start)
-        else:
-            kmerMap[block] = [start]
-    
-    return kmerMap
+                
+        logger.warning("creating pickle file {0}".format(pickle_file))
+        #pickle.dump(kmerMap,open(pickle_file,"wb"))
+        return kmerMap
                 
     
 def readRef(refFilename):
@@ -386,7 +412,13 @@ def readRead(refFilename):
     with open(refFilename) as f:
         descriptorLine = f.readline()
         if ">" not in descriptorLine:
-            raise Exception("Did not find > in first line are you sure this is read file")
+            paired_end_read = descriptorLine.strip().split(',') # The two paired ends are separated by a comma
+            seq1 = ReadSequence(paired_end_read[0])
+            seq2 = ReadSequence(paired_end_read[1])
+            seq1.pairedRead = seq2
+            seq2.pairedRead = seq1
+            paired_end_reads.append(seq1)
+            paired_end_reads.append(seq2)
         for line in f:
             #how do we want to handle paired ends
             paired_end_read = line.strip().split(',') # The two paired ends are separated by a comma
