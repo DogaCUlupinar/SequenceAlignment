@@ -18,8 +18,8 @@ manager = Manager()
 
 #refReadFile = "../HW2/practice_E_1/ref_practice_E_1_chr_1.txt"
                     
-#refReadFile = "../HW2/practice_W_1/ref_practice_W_1_chr_1.txt"
-#readPrefix = "../HW2/practice_W_1/reads/splitreads*"
+refReadFile = "../HW2/practice_W_1/ref_practice_W_1_chr_1.txt"
+readPrefix = "../HW2/practice_W_1/reads/splitreads*"
 
 refReadFile = "../HW2/hw2grad/ref_hw2grad_M_1_chr_1.txt"
 readPrefix = "../HW2/hw2grad/reads/splitreads*"
@@ -45,4 +45,6 @@ for worker in workers:
     worker.start()
 for worker in workers:
     worker.join()
-refSeq.printInfo()
+
+aligner = tools.Aligner(refSeq)
+aligner.printInfo()
