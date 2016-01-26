@@ -143,13 +143,14 @@ class ReferenceSequence:
         
         #helper
         self.variations = dict()
-        self.coverage = np.zeros(len(self.refRead),dtype=np.int)
 
         
     def addVariations(self,readVariations):
         for variation in readVariations:
             if self.variations.has_key(variation.pos):
-                self.variations[variation.pos].append(variation.var)
+                list = self.variations[variation.pos]
+                list.append(variation.var)
+                self.variations[variation.pos] = list
             else:
                 self.variations[variation.pos] = [variation.var]
     
@@ -159,8 +160,7 @@ class ReferenceSequence:
             if self.variations[key].count(snp) >= coverage:
                 self.SNP.add((self.refRead[key],snp,key))
                 
-    def findMatch(self,readObj,kmerMap,numBlocks=DEFAULT_NUM_BLOCKS,reverse=False):
-        read = readObj.read
+    def findMatch(self,read,kmerMap,numBlocks=DEFAULT_NUM_BLOCKS,reverse=False):
         if reverse:
             read = read[::-1]
         blockSize = len(read)/numBlocks
@@ -169,30 +169,28 @@ class ReferenceSequence:
             start = explore_i*blockSize
             end = min(len(read),start+blockSize) #make better need to get read of len and min operators
             block = read[start:end]
-            if kmerMap.has_key(block):
-                for posInRef in kmerMap[block]:
+            block_num = stringDnaToNum(block)
+            if kmerMap.has_key(block_num):
+                for posInRef in kmerMap[block_num]:
                     #verify around each site where the block matches
                     startRef = -explore_i*blockSize + posInRef
                     endRef   = min(len(self.refRead),startRef+len(read)) #make better need to get read of len and min operators
                     variations = diffPlaces(self.refRead,read,startRef,endRef)
                     if len(variations) <= numBlocks-1:
                         self.addVariations(variations)
-                        self.updateCoverage(startRef,endRef)
-                        readObj.setMatchRangeInRef(startRef,endRef)
-                        return True
+                        #self.updateCoverage(startRef,endRef)
+                        return startRef
         
         return False
     
     def findInDels(self,readObj,start_ref,end_ref):
-        self.findInsertions(readObj,start_ref,end_ref)
-        self.findDeletions(readObj,start_ref,end_ref)
+        if self.findInsertions(readObj,start_ref,end_ref) == False:      
+            self.findDeletions(readObj,start_ref,end_ref)
         
-    def findDeletions(self,readObj,start_ref,end_ref):
-        read = readObj.read
+    def findDeletions(self,read,start_ref,end_ref):
         refRead = self.refRead[start_ref:end_ref]
         'currently for deletions'
         last_match_index = 0
-        p = False
 
         while last_match_index <= len(refRead)-len(read):
             logger.info("last match: {0}, length of refRead {1}, length of read {2}".format(str(last_match_index),str(len(refRead)),str(len(read))))
@@ -246,8 +244,7 @@ class ReferenceSequence:
 
         return False
     
-    def findInsertions(self,readObj,start_ref,end_ref):
-        read = readObj.read
+    def findInsertions(self,read,start_ref,end_ref):
         refRead = self.refRead[start_ref:end_ref]
         'currently for Insertions'
         last_match_index = 0
@@ -390,12 +387,25 @@ def generateKmerMap(refRead, readLength, numMerBlocks=DEFAULT_NUM_BLOCKS):
             start = i
             end = start + chunkSize #just ignore if it is not correct size
             block = refRead[start:end]
-            kmerMap[block].append(start)
+            block_num = stringDnaToNum(block)
+            kmerMap[block_num].append(start)
                 
         logger.warning("creating pickle file {0}".format(pickle_file))
         #pickle.dump(kmerMap,open(pickle_file,"wb"))
         return kmerMap
                 
+def stringDnaToNum(stringDna):
+    number = ""
+    for letter in stringDna:
+        if letter == "A":
+            number+="0"
+        elif letter == "C":
+            number+="1"
+        elif letter == "T":
+            number+="2"
+        else:
+            number+="3"
+    return int(number)
     
 def readRef(refFilename):
     refRead = ""
@@ -413,22 +423,60 @@ def readRead(refFilename):
         descriptorLine = f.readline()
         if ">" not in descriptorLine:
             paired_end_read = descriptorLine.strip().split(',') # The two paired ends are separated by a comma
-            seq1 = ReadSequence(paired_end_read[0])
-            seq2 = ReadSequence(paired_end_read[1])
-            seq1.pairedRead = seq2
-            seq2.pairedRead = seq1
-            paired_end_reads.append(seq1)
-            paired_end_reads.append(seq2)
+
+            if paired_end_read[0] != ""  and paired_end_read[1] != "":
+                paired_end_reads.append((paired_end_read[0],paired_end_read[1]))
+                
         for line in f:
             #how do we want to handle paired ends
             paired_end_read = line.strip().split(',') # The two paired ends are separated by a comma
-            seq1 = ReadSequence(paired_end_read[0])
-            seq2 = ReadSequence(paired_end_read[1])
-            seq1.pairedRead = seq2
-            seq2.pairedRead = seq1
-            paired_end_reads.append(seq1)
-            paired_end_reads.append(seq2)
-            
+            if len(paired_end_read[0]) < 40  or len(paired_end_read[1]) < 40:
+                continue
+            paired_end_reads.append((paired_end_read[0],paired_end_read[1]))
+    
     return paired_end_reads
 
+def processRead(id,queue,kmerMap,refSeq):
+    read_count = 0
+    while queue.empty() == False:
+        readFile = queue.get()
+        logger.warning("Process {0} reading in read file: {1}".format(str(id),readFile))
+        unmatchedReads = readRead(readFile)    
+        len_unmatchedReads = len(unmatchedReads)
+       
+        i = 0
+        logger.warning("starting sequencing")
+        for read in unmatchedReads:
+            #read is a tuple
+            i+=1
+            if i % (len_unmatchedReads/10) == 0:
+                logger.warning("Process {0} has completed {1}% of read {2}".format(id,str(100*i/float(len_unmatchedReads)),read_count))
+            
+            found_read1 = refSeq.findMatch(read[0],kmerMap)
+            if found_read1 == False:
+                found_read1 = refSeq.findMatch(read[0],kmerMap,reverse = True)
+                    
+            found_read2 = refSeq.findMatch(read[1],kmerMap)                       
+            if found_read2 == False:
+                found_read2 = refSeq.findMatch(read[1],kmerMap,reverse = True)
 
+            
+            #now we check for indels
+            
+            if (bool(found_read1) ^ bool(found_read2)):
+                #only one was found
+            
+                if bool(found_read1) == True:
+                    #The pairedEnd had a match So lets check within a close distance
+                    start = found_read1
+                    check_read = read[1]
+                else:
+                    start = found_read2
+                    check_read = read[0]
+                    
+                logger.debug("checking for indel between {0} and {1}".format(str(start),str(start+400)))
+                refSeq.findInDels(check_read,start + 50,start + 250) #need to check 50 after start
+                logger.debug("done checking for indel")
+            
+
+        read_count+=1
