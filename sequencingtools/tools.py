@@ -407,8 +407,8 @@ def generateKmerMap(refRead, readLength,manager, numMerBlocks=DEFAULT_NUM_BLOCKS
                 kmerMap[block_num] = [start]
                 
         #logger.warning("creating pickle file {0}".format(pickle_file))
-        pickled_dict = pickle.dumps(kmerMap)
-        print("THE FINAL SIZE" + str(sys.getsizeof(pickled_dict)))
+        #pickled_dict = pickle.dumps(kmerMap)
+        #print("THE FINAL SIZE" + str(sys.getsizeof(pickled_dict)))
         logger.warning("making the dictionary thread safe")
         kmerMap_safe = manager.dict(kmerMap)
         return kmerMap_safe
@@ -434,7 +434,10 @@ def readRead(refFilename):
         for line in f:
             #how do we want to handle paired ends
             paired_end_read = line.strip().split(',') # The two paired ends are separated by a comma
+            if paired_end_read[0] == ""  or paired_end_read[1] == "":
+                continue
             paired_end_reads.append((paired_end_read[0],paired_end_read[1]))
+    
     return paired_end_reads
 
 def processRead(id,queue,kmerMap,refSeq):
