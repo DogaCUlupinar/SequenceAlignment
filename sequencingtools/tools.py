@@ -4,9 +4,6 @@ Created on Jan 7, 2016
 @author: dulupinar
 '''
 from __future__ import print_function
-from multiprocessing import Process, Manager
-import numpy as np
-from collections import defaultdict
 import cPickle as pickle
 from sets import Set
 from operator import itemgetter
@@ -136,8 +133,8 @@ class Aligner:
             self.INS.add(item)
         for item in refSeq.deletions:
             self.DEL.add(item)
-        #helper 
         
+        #helper         
         self.determineInDels()
         self.determineSNP(refSeq.refRead,refSeq.variations)
         
@@ -156,10 +153,10 @@ class Aligner:
                         remove.add(insy)
  
         for tup in remove:
-            if tup in self.deletions:
+            if tup in self.DEL:
                 print("WARNING we are removing dely " + str(tup))
                 self.DEL.remove(tup)
-            if tup in self.insertions:
+            if tup in self.INS:
                 print("WARNING we are removing insy " + str(tup))
                 self.INS.remove(tup)
     
@@ -216,8 +213,9 @@ class ReferenceSequenceSafe:
             start = explore_i*blockSize
             end = min(len(read),start+blockSize) #make better need to get read of len and min operators
             block = read[start:end]
-            if kmerMap.has_key(block):
-                for posInRef in kmerMap[block]:
+            block_num = stringDnaToNum(block)
+            if kmerMap.has_key(block_num):
+                for posInRef in kmerMap[block_num]:
                     #verify around each site where the block matches
                     startRef = -explore_i*blockSize + posInRef
                     endRef   = min(len(self.refRead),startRef+len(read)) #make better need to get read of len and min operators
@@ -230,14 +228,13 @@ class ReferenceSequenceSafe:
         return False
     
     def findInDels(self,readObj,start_ref,end_ref):
-        self.findInsertions(readObj,start_ref,end_ref)
-        self.findDeletions(readObj,start_ref,end_ref)
+        if self.findInsertions(readObj,start_ref,end_ref) == False:      
+            self.findDeletions(readObj,start_ref,end_ref)
         
     def findDeletions(self,read,start_ref,end_ref):
         refRead = self.refRead[start_ref:end_ref]
         'currently for deletions'
         last_match_index = 0
-        p = False
 
         while last_match_index <= len(refRead)-len(read):
             logger.info("last match: {0}, length of refRead {1}, length of read {2}".format(str(last_match_index),str(len(refRead)),str(len(read))))
@@ -286,7 +283,6 @@ class ReferenceSequenceSafe:
                     continue
                 start = start_ref+gap_pos
                 self.updateDeletions(start,deletion)
-                print('found deletion')
                 #self.updateCoverage(start_ref, end_ref)
                 return True
 
@@ -352,7 +348,19 @@ class ReferenceSequenceSafe:
     def updateInsertions(self,start,insertion):
         self.insertions.append((insertion,start))
 
-                                
+def stringDnaToNum(stringDna):
+    number = ""
+    for letter in stringDna:
+        if letter == "A":
+            number+="0"
+        elif letter == "C":
+            number+="1"
+        elif letter == "T":
+            number+="2"
+        else:
+            number+="3"
+    return int(number)
+                         
 def diffPlaces(refRead,read,start,end):
     #check the places where str1 and str2 are different
     #currently string should be of the same length
@@ -392,13 +400,15 @@ def generateKmerMap(refRead, readLength,manager, numMerBlocks=DEFAULT_NUM_BLOCKS
             end = start + chunkSize #just ignore if it is not correct size
             
             block = refRead[start:end]
-            if kmerMap.has_key(block):
-                kmerMap[block].append(start)
+            block_num = stringDnaToNum(block)
+            if kmerMap.has_key(block_num):
+                kmerMap[block_num].append(start)
             else:
-                kmerMap[block] = [start]
+                kmerMap[block_num] = [start]
                 
         #logger.warning("creating pickle file {0}".format(pickle_file))
-        #pickle.dump(kmerMap,open(pickle_file,"wb"))
+        pickled_dict = pickle.dumps(kmerMap)
+        print("THE FINAL SIZE" + str(sys.getsizeof(pickled_dict)))
         logger.warning("making the dictionary thread safe")
         kmerMap_safe = manager.dict(kmerMap)
         return kmerMap_safe
@@ -453,19 +463,21 @@ def processRead(id,queue,kmerMap,refSeq):
 
             
             #now we check for indels
-            '''
+            
             if (bool(found_read1) ^ bool(found_read2)):
                 #only one was found
             
                 if bool(found_read1) == True:
                     #The pairedEnd had a match So lets check within a close distance
                     start = found_read1
+                    check_read = read[1]
                 else:
                     start = found_read2
-                
+                    check_read = read[0]
+                    
                 logger.debug("checking for indel between {0} and {1}".format(str(start),str(start+400)))
-                refSeq.findInDels(read,start,start + 400)
+                refSeq.findInDels(check_read,start + 50,start + 250) #need to check 50 after start
                 logger.debug("done checking for indel")
-            '''
+            
 
         read_count+=1

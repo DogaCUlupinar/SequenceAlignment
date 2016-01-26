@@ -6,11 +6,9 @@ Created on Jan 8, 2016
 '''
 from multiprocessing import Process, Manager, cpu_count, Queue
 import sequencingtools.tools as tools
-import gc
 import logging as logger
 import glob
-import sys
-from __builtin__ import file
+
 
 logger.basicConfig(level=logger.WARNING,format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
 q = Queue()
@@ -21,8 +19,8 @@ manager = Manager()
 refReadFile = "../HW2/practice_W_1/ref_practice_W_1_chr_1.txt"
 readPrefix = "../HW2/practice_W_1/reads/splitreads*"
 
-refReadFile = "../HW2/hw2grad/ref_hw2grad_M_1_chr_1.txt"
-readPrefix = "../HW2/hw2grad/reads/splitreads*"
+#refReadFile = "../HW2/hw2grad/ref_hw2grad_M_1_chr_1.txt"
+#readPrefix = "../HW2/hw2grad/reads/splitreads*"
 
 
 refSeq = tools.ReferenceSequenceSafe(refReadFile,manager)
@@ -33,9 +31,9 @@ a = tools.generateKmerMap(refSeq.refRead,50,manager)
 #readPrefix = "../HW2/hw2grad/reads/splitreads*"
 
 
-readFiles = [file for file in glob.glob(readPrefix)]
-for file in readFiles:
-    q.put(file)
+readFiles = [readfile for readfile in glob.glob(readPrefix)]
+for readfile in readFiles:
+    q.put(readfile)
     
 
 
