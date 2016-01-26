@@ -430,11 +430,14 @@ def readRead(refFilename):
         descriptorLine = f.readline()
         if ">" not in descriptorLine:
             paired_end_read = descriptorLine.strip().split(',') # The two paired ends are separated by a comma
-            paired_end_reads.append((paired_end_read[0],paired_end_read[1]))
+
+            if paired_end_read[0] != ""  and paired_end_read[1] != "":
+                paired_end_reads.append((paired_end_read[0],paired_end_read[1]))
+                
         for line in f:
             #how do we want to handle paired ends
             paired_end_read = line.strip().split(',') # The two paired ends are separated by a comma
-            if paired_end_read[0] == ""  or paired_end_read[1] == "":
+            if len(paired_end_read[0]) < 40  or len(paired_end_read[1]) < 40:
                 continue
             paired_end_reads.append((paired_end_read[0],paired_end_read[1]))
     
