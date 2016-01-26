@@ -169,9 +169,8 @@ class ReferenceSequence:
             start = explore_i*blockSize
             end = min(len(read),start+blockSize) #make better need to get read of len and min operators
             block = read[start:end]
-            block_num = stringDnaToNum(block)
-            if kmerMap.has_key(block_num):
-                for posInRef in kmerMap[block_num]:
+            if kmerMap.has_key(block):
+                for posInRef in kmerMap[block]:
                     #verify around each site where the block matches
                     startRef = -explore_i*blockSize + posInRef
                     endRef   = min(len(self.refRead),startRef+len(read)) #make better need to get read of len and min operators
@@ -387,8 +386,7 @@ def generateKmerMap(refRead, readLength, numMerBlocks=DEFAULT_NUM_BLOCKS):
             start = i
             end = start + chunkSize #just ignore if it is not correct size
             block = refRead[start:end]
-            block_num = stringDnaToNum(block)
-            kmerMap[block_num].append(start)
+            kmerMap[block].append(start)
                 
         logger.warning("creating pickle file {0}".format(pickle_file))
         #pickle.dump(kmerMap,open(pickle_file,"wb"))
