@@ -21,7 +21,7 @@ logger.basicConfig(level=logger.WARNING,format='%(asctime)s %(message)s', datefm
 
 DEFAULT_ERRORS     = 3                 #errors per Read
 DEFAULT_NUM_BLOCKS = DEFAULT_ERRORS +1 #kmer + 1
-DEFAULT_COVERAGE   = 10
+DEFAULT_COVERAGE   = 8
 
 class STR(set):
     def __init__(self):
