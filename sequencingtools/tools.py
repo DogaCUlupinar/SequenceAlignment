@@ -4,7 +4,6 @@ Created on Jan 7, 2016
 @author: dulupinar
 '''
 from __future__ import print_function
-import numpy as np
 from collections import defaultdict
 import cPickle as pickle
 from sets import Set
