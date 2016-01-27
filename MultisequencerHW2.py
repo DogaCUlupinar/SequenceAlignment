@@ -14,15 +14,15 @@ logger.basicConfig(level=logger.WARNING,format='%(asctime)s %(message)s', datefm
 q = Queue()
 manager = Manager()
 
-refReadFile = "../HW2/practice_E_1/ref_practice_E_1_chr_1.txt"
-readPrefix = "../HW2/practice_E_1/reads/splitreads*"
+#refReadFile = "../HW2/practice_E_1/ref_practice_E_1_chr_1.txt"
+#readPrefix = "../HW2/practice_E_1/reads/splitreads*"
                     
 #refReadFile = "../HW2/practice_W_1/ref_practice_W_1_chr_1.txt"
 #readPrefix = "../HW2/practice_W_1/reads/splitreads*"
 
-#refReadFile = "../HW2/hw2grad/ref_hw2grad_M_1_chr_1.txt"
-#readPrefix = "../HW2/hw2grad/reads/splitreads*"
-
+refReadFile = "../HW2lnx/hw2grad/ref_hw2grad_M_1_chr_1.txt"
+readPrefix = "../HW2lnx/hw2grad/reads/splitreads*"
+output = open("hw2practice.txt",'w')
 
 refSeq = tools.ReferenceSequenceSafe(refReadFile,manager)
 logger.warning("reading in reference file: " + refReadFile)
@@ -46,4 +46,4 @@ for worker in workers:
     worker.join()
 
 aligner = tools.Aligner(refSeq)
-aligner.printInfo()
+aligner.printInfo(filestream=output)
