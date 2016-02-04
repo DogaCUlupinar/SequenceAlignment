@@ -8,6 +8,7 @@ import unittest
 import difflib
 import sequencingtools.tools as tools
 import sys
+import glob
 class TestSequencer1(unittest.TestCase):
     
     def test_del1(self):
@@ -116,41 +117,64 @@ class TestSequencer8(unittest.TestCase):
         
 class TestSequencerRegress(unittest.TestCase):   
     def test_del(self):
-            refReadFile = "../HW1/practice_W_1/ref_practice_W_1_chr_1.txt"
-            readFile = "../HW1/practice_W_1/reads_practice_W_1_chr_1.txt"
-            gen_file = "../HW1/forcredit/testcase_gen.txt"
-            solution_file = "../HW1/forcredit/testcase.txt"
-            output = open(gen_file,'w')  
-            unmatchedReads = tools.readRead(readFile)
-            
-            refSeq = tools.ReferenceSequence(refReadFile)
-            a = tools.generateKmerMap(refSeq.refRead,len(unmatchedReads[0].read))
-            
+        refReadFile = "/Users/dulupinar/Documents/UCLA/Classes/Winter16/CM222/HW2/practice_W_1/ref_practice_W_1_chr_1.txt"
+        readPrefix = "/Users/dulupinar/Documents/UCLA/Classes/Winter16/CM222/HW2/practice_W_1/reads/splitreads*"
+        gen_file = "../HW1/forcredit/testcase_gen.txt"
+        solution_file = "../HW1/forcredit/testcase.txt"
+        output = open(gen_file,'w') 
+        
+        readFiles = [file for file in glob.glob(readPrefix)]
+        
+        refSeq = tools.ReferenceSequence(refReadFile)
+        kmerMap = tools.generateKmerMap(refSeq.refRead,50)
+        read_count = 0
+        for readFile in readFiles:
+            unmatchedReads = tools.readRead(readFile)    
+            len_unmatchedReads = len(unmatchedReads)
+           
+            i = 0
+        
             for read in unmatchedReads:
-                if refSeq.findMatch(read,a) == False:
-                    if refSeq.findMatch(read,a,reverse = True) == False:
-                        if read.pairedRead.matchRangeInRef is not None:
-                            #The pairedEnd had a match So lets check within a close distance
-                            start = read.pairedRead.matchRangeInRef[1]+50
-                            refSeq.findInDels(read,start,start + 400)
-                        else:
-                            #the pairedEnd did not find a match so lets check over the whole distance
-                            #refSeq.findInDels(read,0,len(refSeq.refRead))
-                            pass
-                      
-            refSeq.printInfo(filestream=output)
-            output.close()
-            
-            with open(solution_file,'r') as sol:
-                with open(gen_file,'r') as gen:
-                    diff = difflib.unified_diff(sol.readlines(), gen.readlines(), fromfile=solution_file, tofile=gen_file)
-            
-            Fail = False
-            for line in diff:
-                Fail = True
-                sys.stdout.write(line)
+                #read is a tuple
+                i+=1
                 
-            self.assertEqual(Fail,False)
+                found_read1 = refSeq.findMatch(read[0],kmerMap)
+                if found_read1 == False:
+                    found_read1 = refSeq.findMatch(read[0],kmerMap,reverse = True)
+                        
+                found_read2 = refSeq.findMatch(read[1],kmerMap)                       
+                if found_read2 == False:
+                    found_read2 = refSeq.findMatch(read[1],kmerMap,reverse = True)
+        
+                
+                #now we check for indels
+                
+                if (bool(found_read1) ^ bool(found_read2)):
+                    #only one was found
+                
+                    if bool(found_read1) == True:
+                        #The pairedEnd had a match So lets check within a close distance
+                        start = found_read1
+                        check_read = read[1]
+                    else:
+                        start = found_read2
+                        check_read = read[0]
+                        
+                    refSeq.findInDels(check_read,start + 50,start + 250) #need to check 50 after start
+            read_count+=1
+        refSeq.printInfo(filestream=output)
+        output.close()
+            
+        with open(solution_file,'r') as sol:
+            with open(gen_file,'r') as gen:
+                diff = difflib.unified_diff(sol.readlines(), gen.readlines(), fromfile=solution_file, tofile=gen_file)
+        
+        Fail = False
+        for line in diff:
+            Fail = True
+            sys.stdout.write(line)
+            
+        self.assertEqual(Fail,False)
                 
 if __name__ == "__main__":
 

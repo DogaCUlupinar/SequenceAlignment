@@ -13,8 +13,8 @@ from __builtin__ import file
 
 logger.basicConfig(level=logger.WARNING,format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
 
-#refReadFile = "../HW2/practice_E_1/ref_practice_E_1_chr_1.txt"
-#readFile = "../HW2/practice_E_1/reads_practice_E_1_chr_1.txt"
+#refReadFile = "/Users/dulupinar/Documents/UCLA/Classes/Winter16/CM222/HW2/practice_W_1/ref_practice_W_1_chr_1.txt"
+#readPrefix = "/Users/dulupinar/Documents/UCLA/Classes/Winter16/CM222/HW2/practice_W_1/reads/splitreads*"
 
 refReadFile = "../HW2lnx/hw2grad/ref_hw2grad_M_1_chr_1.txt"
 readPrefix = "../HW2lnx/hw2grad/reads/splitreads*"
@@ -66,4 +66,4 @@ for readFile in readFiles:
             refSeq.findInDels(check_read,start + 50,start + 250) #need to check 50 after start
             logger.debug("done checking for indel")
     read_count+=1
-refSeq.printInfo(filestream=output)
+refSeq.printInfo()
