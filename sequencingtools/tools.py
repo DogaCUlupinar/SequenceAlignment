@@ -4,7 +4,7 @@ Created on Jan 7, 2016
 @author: dulupinar
 '''
 from __future__ import print_function
-from collections import defaultdict
+from collections import defaultdict, Counter, OrderedDict
 import cPickle as pickle
 from sets import Set
 from operator import itemgetter
@@ -12,8 +12,12 @@ from sys import stdout
 import logging as logger
 import os
 import sys
+import operator
+
 #from guppy import hpy
 #hp = hpy()
+alpha = ["A","B","C","D"]
+
 
 logger.basicConfig(level=logger.WARNING,format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
 
@@ -22,15 +26,7 @@ DEFAULT_ERRORS     = 3                 #errors per Read
 DEFAULT_NUM_BLOCKS = DEFAULT_ERRORS +1 #kmer + 1
 DEFAULT_COVERAGE   = 8
 
-class STR(set):
-    def __init__(self):
-        self.header = ">STR"
-        set.__init__(self)
-        
-    def __str__(self):
-        return_string = self.header + "\n"
-        return return_string
-    
+
 class CNV(set):
     def __init__(self):
         self.header = ">CNV"
@@ -56,6 +52,18 @@ class INV(set):
     def __str__(self):
         return_string = self.header + "\n"
         return return_string
+    
+class STR(set):
+    def __init__(self):
+        self.header = ">STR"
+        set.__init__(self)
+        
+    def __str__(self):
+        return_string = self.header + "\n"
+        for tup in sorted(self,key=itemgetter(0)):
+            return_string+=tup[1]+","+str(tup[0])+"\n"
+        return return_string
+    
         
 class SNP(set):
     def __init__(self):
@@ -125,6 +133,7 @@ class ReferenceSequence:
         if debug:
             #the filename just becomes the refRead makes debugging easier
             self.refRead = filename 
+            self.name = "DEBUG"
         else:
             fileContent = readRef(filename)
             self.refRead = fileContent[0]
@@ -143,6 +152,62 @@ class ReferenceSequence:
         #helper
         self.variations = dict()
 
+    def findSTR(self):
+        #find all str
+        str_count = defaultdict(list) #key is kmer value is postions
+        str_dict  = dict() #key is position value is str
+        repeat_min = 3
+        len_read = len(self.refRead)
+        for i in range(len(self.refRead) - 6):
+            if i % (len_read/25) == 0:logger.warn("processed {0} of {1} of read".format(i,len_read))
+            kmer_3 = self.refRead[i:i+3]
+            kmer_4 = self.refRead[i:i+4]
+            kmer_5 = self.refRead[i:i+5]
+            str_count[kmer_3].append(i)
+            str_count[kmer_4].append(i)
+            str_count[kmer_5].append(i)
+        
+        ii = 0
+        len_dict = len(str_count)
+        for kmer in str_count:
+            if ii % (len_dict/20) == 0:logger.warn("Checking the {0}th kmer".format(str(ii)))
+            ii+=1         
+            len_kmer = len(kmer)
+            positions = str_count[kmer]
+            
+            #for each str
+            pos_str = -1 #position of str
+            str_seq = "" #str itself
+            repeat_length = 1 #number of times str is repeated
+            for index in range(len(positions) -1):
+                pos = positions[index]
+                if pos+len_kmer == positions[index+1]:
+                    #finding str
+                    if pos_str == -1:
+                        pos_str = pos                  
+                    repeat_length+=1
+                    str_seq+=kmer
+                else:
+                    if repeat_length > repeat_min:
+                        str_dict[pos_str] = str_seq
+                    pos_str = -1
+                    str_seq = ""
+                    repeat_length = 1
+                
+                if repeat_length > repeat_min:
+                    str_dict[pos_str] = str_seq
+            
+        sorted_d = sorted(str_dict.items(), key=operator.itemgetter(0))
+        self.STR.add(sorted_d[0])
+        
+        for index in range(len(sorted_d) -1)[1:]:
+            prev = sorted_d[index -1][0]
+            current = sorted_d[index][0]
+            if prev < current - 5:
+                self.STR.add(sorted_d[index])
+         
+        return self.STR      
+            
         
     def addVariations(self,readVariations):
         for variation in readVariations:
@@ -390,6 +455,17 @@ def generateKmerMap(refRead, readLength, numMerBlocks=DEFAULT_NUM_BLOCKS):
         logger.warning("creating pickle file {0}".format(pickle_file))
         #pickle.dump(kmerMap,open(pickle_file,"wb"))
         return kmerMap
+
+def allKmerBetter(end,kmer,alpha,counter):
+    if len(kmer) == end:
+        counter[kmer]=[]
+        return counter
+
+    for i in alpha:
+        kmer_new= kmer + i
+        allKmerBetter(end,kmer_new,alpha,counter)
+    
+    return counter
                 
 def stringDnaToNum(stringDna):
     number = ""
@@ -477,3 +553,8 @@ def processRead(id,queue,kmerMap,refSeq):
             
 
         read_count+=1
+
+if __name__ == "__main__":
+    dicter = defaultdict(list)
+    a = allKmerBetter(3, "", alpha, dicter)
+    print(a)
