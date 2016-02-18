@@ -5,7 +5,7 @@ Created on Feb 13, 2016
 '''
 from collections import defaultdict, Counter
 from tools import readRead
-
+MIN_SIZE = 450 #try 37 too
 def my_de_bruijn(sequence_reads, k):
     #sequence reads is a tuple and makes it into k
     
@@ -120,6 +120,7 @@ def de_bruijn_reassemble_smart(de_bruijn_graph,degree_dict):
         i+=1
         current_point = good_start
         assembled_string = current_point
+        contig_size = 0
         while True:
             try:
                 next_values = de_bruijn_graph[current_point]
@@ -131,10 +132,14 @@ def de_bruijn_reassemble_smart(de_bruijn_graph,degree_dict):
                 assembled_string += next_edge[-1]
                 de_bruijn_graph[current_point] = next_values
                 current_point = next_edge
+                contig_size+=1
             except KeyError:
+                print "contig Size; ",contig_size
+                
                 print "key error,",current_point,max(0,degree_dict[current_point][1] -1)
                 degree_dict[current_point] = (degree_dict[current_point][0],max(0,degree_dict[current_point][1] -1))
-                assembled_strings.append(assembled_string)
+                if contig_size > MIN_SIZE: assembled_strings.append(assembled_string)
+                contig_size = 0
                 break
     return assembled_strings
 
@@ -178,6 +183,7 @@ def de_bruijn_reassemble(de_bruijn_graph):
         i+=1
         current_point = good_start
         assembled_string = current_point
+        contig_size = 0
         while True:
             try:
                 next_values = de_bruijn_graph[current_point]
@@ -185,7 +191,10 @@ def de_bruijn_reassemble(de_bruijn_graph):
                 assembled_string += next_edge[-1]
                 de_bruijn_graph[current_point] = next_values
                 current_point = next_edge
+                contig_size+=1
             except KeyError:
+                print "contig size ", contig_size
+                contig_size = 0
                 assembled_strings.append(assembled_string)
                 break
     return assembled_strings
@@ -213,7 +222,7 @@ if __name__ == "__main__":
     output = de_bruijn_reassemble_smart(simple_graph,degree_dict)
     #output = de_bruijn_reassemble(simple_graph)
     chr_name = "hw3all_A_3_chr_1"
-    output_fn = '/Users/dulupinar/Documents/UCLA/Classes/Winter16/CM222/HW3/assembled_Super_smart_{}.txt'.format(chr_name)
+    output_fn = '/Users/dulupinar/Documents/UCLA/Classes/Winter16/CM222/HW3/assembled_{0}_Super_smart_{1}.txt'.format(str(MIN_SIZE),chr_name)
     
     with open(output_fn, 'w') as output_file:
         output_file.write('>' + chr_name + '\n')
