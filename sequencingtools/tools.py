@@ -4,11 +4,13 @@ Created on Jan 7, 2016
 @author: dulupinar
 '''
 from __future__ import print_function
+from bisect import bisect_left
 from collections import defaultdict, Counter, OrderedDict
 import cPickle as pickle
 from sets import Set
 from operator import itemgetter
 from sys import stdout
+import re
 import logging as logger
 import os
 import sys
@@ -16,7 +18,7 @@ import operator
 
 #from guppy import hpy
 #hp = hpy()
-alpha = ["A","B","C","D"]
+alpha = ["A","C","T","G"]
 
 
 logger.basicConfig(level=logger.WARNING,format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
@@ -151,12 +153,61 @@ class ReferenceSequence:
         
         #helper
         self.variations = dict()
+    def generateDonor(self):
+        self.determineSNP()
+        self.determineInDels()
+        self.donor_seq = list(self.refRead)
+        for snp in self.SNP:
+            self.donor_seq[snp[2]] = snp[1]
+        
+        index_offset = 0
+        """
+        insertions are find but when i use them my score goes to poop
+        for ins in sorted(self.insertions,key=itemgetter(1)):
+            string = "insertion "+ ins[0] + " at: "+ str(ins[1] + index_offset)
+            print(string)
+            self.donor_seq.insert(ins[1] + index_offset,ins[0])
+            index_offset += 1
+            
 
+        for dell in self.deletions:
+            del self.donor_seq[dell[1] + index_offset:dell[1]+len(dell[0]) + index_offset]
+            index_offset -=len(dell[0])
+        """
+        self.donor_seq = "".join(self.donor_seq)
+        return self.donor_seq
+        
+    def findSTRRegex(self):
+        all_kmer = dict()
+        allKmer(3, "", alpha, all_kmer)
+        allKmer(4, "", alpha, all_kmer)
+        allKmer(5, "", alpha, all_kmer)
+        
+        len_dict = len(all_kmer)
+        ii = 0
+        dict_str = dict() #key is start pos, #val is string
+        for key in all_kmer:
+            if ii % (len_dict/20) == 0:logger.warn("Checking the {0}th kmer".format(str(ii)))
+            ii+=1
+            for m in re.finditer("({kmer}){{4,}}".format(kmer=key),self.refRead):
+                dict_str[m.start()] = m.group()
+               
+        sorted_d = sorted(dict_str.items(), key=operator.itemgetter(0))
+        self.STR.add(sorted_d[0])
+        
+        for index in range(len(sorted_d) -1)[1:]:
+            prev = sorted_d[index -1][0]
+            current = sorted_d[index][0]
+            if prev < current - 5:
+                self.STR.add(sorted_d[index])
+                
+        return self.STR
+        
     def findSTR(self):
         #find all str
         str_count = defaultdict(list) #key is kmer value is postions
         str_dict  = dict() #key is position value is str
-        repeat_min = 3
+        repeat_min = 4
         len_read = len(self.refRead)
         for i in range(len(self.refRead) - 6):
             if i % (len_read/25) == 0:logger.warn("processed {0} of {1} of read".format(i,len_read))
@@ -179,22 +230,26 @@ class ReferenceSequence:
             pos_str = -1 #position of str
             str_seq = "" #str itself
             repeat_length = 1 #number of times str is repeated
-            for index in range(len(positions) -1):
+            index = 0
+            while index in range(len(positions) -1):
                 pos = positions[index]
-                if pos+len_kmer == positions[index+1]:
+                find = getIndex(positions,pos+len_kmer,index)
+                if find != False:
                     #finding str
                     if pos_str == -1:
                         pos_str = pos                  
                     repeat_length+=1
                     str_seq+=kmer
+                    index = find
                 else:
                     if repeat_length > repeat_min:
                         str_dict[pos_str] = str_seq
                     pos_str = -1
                     str_seq = ""
                     repeat_length = 1
+                    index+=1
                 
-                if repeat_length > repeat_min:
+            if repeat_length > repeat_min:
                     str_dict[pos_str] = str_seq
             
         sorted_d = sorted(str_dict.items(), key=operator.itemgetter(0))
@@ -206,7 +261,7 @@ class ReferenceSequence:
             if prev < current - 5:
                 self.STR.add(sorted_d[index])
          
-        return self.STR      
+        return str_dict,str_count     
             
         
     def addVariations(self,readVariations):
@@ -412,7 +467,15 @@ class ReferenceSequence:
                     deletion = ""
             else:         
                 deletion += self.refRead[pos]
-                
+
+def getIndex(a, x,start):
+    'Locate the leftmost value exactly equal to x'
+    i = bisect_left(a, x,lo=start)
+    if i != len(a) and a[i] == x:
+        return i
+    else:
+        return False
+                   
 def diffPlaces(refRead,read,start,end):
     #check the places where str1 and str2 are different
     #currently string should be of the same length
@@ -455,15 +518,56 @@ def generateKmerMap(refRead, readLength, numMerBlocks=DEFAULT_NUM_BLOCKS):
         logger.warning("creating pickle file {0}".format(pickle_file))
         #pickle.dump(kmerMap,open(pickle_file,"wb"))
         return kmerMap
-
+    
+class STRCandidate():
+    def __init__(self,pattern):
+        self.pattern = pattern #this is read
+        self.reads = []
+        self.std_dev = -1
+    
+    def matchKmerBAD(self,read):
+        
+        match = self.pattern.match(read)
+        if match:
+            self.addRead(read)
+            return True
+        else:
+            return False
+        
+    def matchKmer(self,read):
+             
+        if self.pattern*5 in read:
+            self.addRead(read)
+            return True
+        else:
+            return False
+        
+    def addRead(self,read):
+        self.reads.append(read)
+    
 def allKmerBetter(end,kmer,alpha,counter):
     if len(kmer) == end:
-        counter[kmer]=[]
+        #pattern = re.compile("\w{{0,24}}((?:{kmer_pat}){{3,20}})\w{{0,24}}".format(kmer_pat=kmer))
+        
+        counter[kmer]= STRCandidate(kmer)
         return counter
 
     for i in alpha:
         kmer_new= kmer + i
         allKmerBetter(end,kmer_new,alpha,counter)
+    
+    return counter
+
+def allKmer(end,kmer,alpha,counter):
+    if len(kmer) == end:
+        #pattern = re.compile("\w{{0,24}}((?:{kmer_pat}){{3,20}})\w{{0,24}}".format(kmer_pat=kmer))
+        
+        counter[kmer]=[]
+        return counter
+
+    for i in alpha:
+        kmer_new= kmer + i
+        allKmer(end,kmer_new,alpha,counter)
     
     return counter
                 
@@ -553,6 +657,16 @@ def processRead(id,queue,kmerMap,refSeq):
             
 
         read_count+=1
+'''        
+def rr(all_kmer,kmer,corr):
+    summ = 0
+    for r in all_kmer[kmer].reads:
+        summ+=r.count(kmer)
+        
+    print "summ of kmer: ", summ
+    print "times in corr" ,corr.count(kmer)
+    print "avg times", summ/corr.count(kmer)
+'''
 
 if __name__ == "__main__":
     dicter = defaultdict(list)
