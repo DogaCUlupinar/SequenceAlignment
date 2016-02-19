@@ -13,12 +13,12 @@ import sys
 #refReadFile = "./forcredit/hw1_W_2/ref_hw1_W_2_chr_1.txt"
 #readFile = "./forcredit/hw1_W_2/reads_hw1_W_2_chr_1.txt"
 
-refReadFile = "../HW2/practice_E_1/ref_practice_E_1_chr_1.txt"
-readFile = "../HW2/practice_E_1/reads_practice_E_1_chr_1.txt"
+refReadFile = "../HW1/practice_W_1/ref_practice_W_1_chr_1.txt"
+readFile = "../HW1/practice_W_1/reads_practice_W_1_chr_1.txt"
 
 refSeq = tools.ReferenceSequence(refReadFile)
 
-if False:
+if True:
     unmatchedReads = tools.readRead(readFile)
     kmerMap = tools.generateKmerMap(refSeq.refRead,50)
     i =0
@@ -57,5 +57,5 @@ if False:
             logger.debug("checking for indel between {0} and {1}".format(str(start),str(start+400)))
             refSeq.findInDels(check_read,start + 50,start + 250) #need to check 50 after start
             logger.debug("done checking for indel")
-          
+   
     refSeq.printInfo()

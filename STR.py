@@ -17,7 +17,7 @@ def reject_outliers(data, m=2):
 
 #refReadFile = "./forcredit/hw1_W_2/ref_hw1_W_2_chr_1.txt"
 #readFile = "./forcredit/hw1_W_2/reads_hw1_W_2_chr_1.txt"
-output = open("str_test_grad_TEST.txt",'w') 
+output = open("str_test_grad_write3.txt",'w') 
 refReadFile = "../HW2/practice_E_1/ref_practice_E_1_chr_1.txt"
 readFile = "../HW2/practice_E_1/reads_practice_E_1_chr_1.txt"
 #refReadFile = "../HW2/hw2grad/ref_hw2grad_M_1_chr_1.txt"
@@ -82,7 +82,6 @@ for read in unmatchedReads:
 donor = refSeq.generateDonor()
 refSeq.findSTRRegex() 
 refSeq.printInfo(output)
-refSeq.printInfo()
 
 if False:
     #this is the bad way to do everything
@@ -187,8 +186,6 @@ if False:
             if good_str_tup:
                 good_str_set.add((p_tup[0],(p_tup[1]/5)*p_tup[2]))
                 print "adding ",p_tup[0],p_tup[1]*p_tup[2]
-            
-refSeq.printInfo(output)
 
 
 

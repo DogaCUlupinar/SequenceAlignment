@@ -6,6 +6,7 @@ Created on Jan 7, 2016
 from __future__ import print_function
 from bisect import bisect_left
 from collections import defaultdict, Counter, OrderedDict
+import numpy as np
 import cPickle as pickle
 from sets import Set
 from operator import itemgetter
@@ -157,26 +158,46 @@ class ReferenceSequence:
         self.determineSNP()
         self.determineInDels()
         self.donor_seq = list(self.refRead)
+        self.index_match  = np.linspace(0,len(self.refRead) -1,num=len(self.refRead),dtype=int) #key reference position value is position in ref
         for snp in self.SNP:
             self.donor_seq[snp[2]] = snp[1]
         
         index_offset = 0
-        """
-        insertions are find but when i use them my score goes to poop
+        match_offset = 0
+        last_update = 0
+        #insertions are find but when i use them my score goes to poop
         for ins in sorted(self.insertions,key=itemgetter(1)):
-            string = "insertion "+ ins[0] + " at: "+ str(ins[1] + index_offset)
-            print(string)
+            #update index_match
+            for i in range(last_update,ins[1]):
+                self.index_match[i]+=match_offset
+                
             self.donor_seq.insert(ins[1] + index_offset,ins[0])
             index_offset += 1
-            
-
+            match_offset+=len(ins[0])
+            last_update = ins[1]
+        
+        for i in range(last_update,len(self.refRead)):
+                self.index_match[i]+=index_offset
+        
+        """
         for dell in self.deletions:
             del self.donor_seq[dell[1] + index_offset:dell[1]+len(dell[0]) + index_offset]
             index_offset -=len(dell[0])
+        Over it
         """
+        
         self.donor_seq = "".join(self.donor_seq)
         return self.donor_seq
+    
+    def translateIndex(self,donor_index):
+        while True:
+            try:
+                match = np.where(self.index_match==donor_index)[0][0]
+                break
+            except IndexError:
+                donor_index+=1
         
+        return match      
     def findSTRRegex(self):
         all_kmer = dict()
         allKmer(3, "", alpha, all_kmer)
@@ -189,8 +210,9 @@ class ReferenceSequence:
         for key in all_kmer:
             if ii % (len_dict/20) == 0:logger.warn("Checking the {0}th kmer".format(str(ii)))
             ii+=1
-            for m in re.finditer("({kmer}){{4,}}".format(kmer=key),self.refRead):
-                dict_str[m.start()] = m.group()
+            for m in re.finditer("({kmer}){{4,}}".format(kmer=key),self.donor_seq):
+                match_inref = self.translateIndex(m.start())
+                dict_str[match_inref] = m.group()
                
         sorted_d = sorted(dict_str.items(), key=operator.itemgetter(0))
         self.STR.add(sorted_d[0])
@@ -420,7 +442,7 @@ class ReferenceSequence:
         self.determineSNP()
         self.determineInDels()
         for attribute in self.attributes:
-            print(attribute,file=filestream,end="")
+            filestream.write(str(attribute))
 
         
     def updateCoverage(self,start,end):
