@@ -210,7 +210,7 @@ class ReferenceSequence:
         for key in all_kmer:
             if ii % (len_dict/20) == 0:logger.warn("Checking the {0}th kmer".format(str(ii)))
             ii+=1
-            for m in re.finditer("({kmer}){{4,}}".format(kmer=key),self.donor_seq):
+            for m in re.finditer("({kmer}){{{rep},}}".format(kmer=key,rep=4-(len(key)-4)),self.donor_seq):
                 match_inref = self.translateIndex(m.start())
                 dict_str[match_inref] = m.group()
                

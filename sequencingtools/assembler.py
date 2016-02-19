@@ -5,7 +5,10 @@ Created on Feb 13, 2016
 '''
 from collections import defaultdict, Counter
 from tools import readRead
-MIN_SIZE = 450 #try 37 too
+import numpy as np
+import matplotlib.pyplot as plt
+
+MIN_SIZE = 35 #try 37 too
 def my_de_bruijn(sequence_reads, k):
     #sequence reads is a tuple and makes it into k
     
@@ -114,6 +117,7 @@ def de_bruijn_reassemble_smart(de_bruijn_graph,degree_dict):
             print "DID NOT FIND",i
             good_starts = [k for k in de_bruijn_graph if de_bruijn_graph[k]]
             good_start = good_starts[0]
+            print "DID NOT FIND using",i,good_start
         # You may want to find a better start
         # position by looking at in and out-degrees,
         # but this will work okay.
@@ -124,7 +128,18 @@ def de_bruijn_reassemble_smart(de_bruijn_graph,degree_dict):
         while True:
             try:
                 next_values = de_bruijn_graph[current_point]
-                next_edge = next_values.pop()
+                next_edge = None
+                for value in next_values:
+                    #find nodes where indegree = outdegree
+                    try:
+                        if degree_dict[value][0] == degree_dict[value][0]:
+                            next_edge = value
+                            next_values.remove(value)
+                            print "Found good next node"
+                            break
+                    except KeyError:
+                        break
+                if next_edge ==None : next_values.pop()
                 #update incoming
                 degree_dict[next_edge] = (max(0,degree_dict[next_edge][0] -1),degree_dict[next_edge][1])
                 #update outgoing
@@ -143,62 +158,6 @@ def de_bruijn_reassemble_smart(de_bruijn_graph,degree_dict):
                 break
     return assembled_strings
 
-def de_bruijn_reassemble(de_bruijn_graph):
-    """
-    Traverses the DeBruijn Graph created by simple_de_bruijn and
-    returns contigs that come from it.
-    :param de_bruijn_graph: A De Bruijn Graph
-    :return: a list of the
-    """
-
-    assembled_strings = []
-    i = 0
-    skip = False
-    while True:
-        n_values = sum([len(de_bruijn_graph[k]) for k in de_bruijn_graph])
-        print "values left ",n_values
-        if n_values == 0:
-            break
-        found = False
-        if skip == False:
-            for key_node in de_bruijn_graph:
-                out_degree = len(de_bruijn_graph[key_node])
-                in_degree  = inDegree(key_node, de_bruijn_graph)
-                if in_degree < out_degree:
-                    good_start = key_node
-                    found = True
-                    print "found ",i
-                    
-                    break
-                
-            
-        if found == False:
-            print "DID NOT FIND",i
-            skip = True
-            good_starts = [k for k in de_bruijn_graph if de_bruijn_graph[k]]
-            good_start = good_starts[0]
-        # You may want to find a better start
-        # position by looking at in and out-degrees,
-        # but this will work okay.
-        i+=1
-        current_point = good_start
-        assembled_string = current_point
-        contig_size = 0
-        while True:
-            try:
-                next_values = de_bruijn_graph[current_point]
-                next_edge = next_values.pop()
-                assembled_string += next_edge[-1]
-                de_bruijn_graph[current_point] = next_values
-                current_point = next_edge
-                contig_size+=1
-            except KeyError:
-                print "contig size ", contig_size
-                contig_size = 0
-                assembled_strings.append(assembled_string)
-                break
-    return assembled_strings
-
 def inDegree(kmer,de_bruijn_graph):
     in_degree = 0
     for k in de_bruijn_graph:
@@ -206,18 +165,39 @@ def inDegree(kmer,de_bruijn_graph):
             in_degree+=1
     return in_degree 
 
+def createDistribution(de_bruijn_graph):
+    coverage = Counter()
     
+    """
+    for paired_end_read in paired_end_reads:
+        for read in paired_end_read:
+            coverage[read]+=1
+    """
+    for key in de_bruijn_graph:
+        for edges in de_bruijn_graph[key]:
+            coverage[edges]+=1
+    
+    max_occurence = coverage.most_common(1)[0][1]
+    distrib = np.zeros(max_occurence + 1,dtype=int)
+    for key in coverage:
+        distrib[coverage[key]]+=1
+        
+    return distrib
     
 if __name__ == "__main__":
     reads = "/Users/dulupinar/Documents/UCLA/Classes/Winter16/CM222/HW3/spectrum_A_1/reads_spectrum_A_1_chr_1.txt"
     reads = "/Users/dulupinar/Documents/UCLA/Classes/Winter16/CM222/HW3/reads_hw3all_A_3_chr_1.txt"
     
     paired_end_reads = readRead(reads)
-    simple_graph= simple_de_bruijn(paired_end_reads,25)
-    de_bruijn_graph = simple_graph
+    simple_graph= simple_de_bruijn(paired_end_reads,35)
+    distrib = createDistribution(simple_graph)
+    plt.plot(distrib)
+    plt.show()
+if False:
+
     print "Created Graph"
     
-    degree_dict = allDegrees(de_bruijn_graph)
+    degree_dict = allDegrees(simple_graph)
     print "Created Dict"
     output = de_bruijn_reassemble_smart(simple_graph,degree_dict)
     #output = de_bruijn_reassemble(simple_graph)
