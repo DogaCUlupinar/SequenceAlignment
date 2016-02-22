@@ -6,6 +6,7 @@ Created on Feb 13, 2016
 from collections import defaultdict, Counter
 from tools import readRead
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 
 MIN_SIZE = 35 #try 37 too
@@ -50,6 +51,9 @@ def simple_de_bruijn(sequence_reads, k):
     # to help you find the beginnning and end of the sequence.
     for paired_read in sequence_reads:
         for read in paired_read:
+            #random
+            randy = random.randint(0, 15)
+            if randy <= 1: read=read[::-1]
             # Cut the read into k-mers
             kmers = [read[i: i + k] for i in range(len(read) - k)]
             for i in range(len(kmers) - 1):
@@ -190,10 +194,10 @@ if __name__ == "__main__":
     
     paired_end_reads = readRead(reads)
     simple_graph= simple_de_bruijn(paired_end_reads,35)
-    distrib = createDistribution(simple_graph)
-    plt.plot(distrib)
-    plt.show()
-if False:
+    #distrib = createDistribution(simple_graph)
+    #plt.plot(distrib)
+    #plt.show()
+if True:
 
     print "Created Graph"
     
