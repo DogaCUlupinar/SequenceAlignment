@@ -159,8 +159,11 @@ class ReferenceSequence:
         self.determineInDels()
         self.donor_seq = list(self.refRead)
         self.index_match  = np.linspace(0,len(self.refRead) -1,num=len(self.refRead),dtype=int) #key reference position value is position in ref
+       
+        
         for snp in self.SNP:
             self.donor_seq[snp[2]] = snp[1]
+        
         
         index_offset = 0
         match_offset = 0
@@ -546,15 +549,8 @@ class STRCandidate():
         self.pattern = pattern #this is read
         self.reads = []
         self.std_dev = -1
+        self.start_pos = [0]
     
-    def matchKmerBAD(self,read):
-        
-        match = self.pattern.match(read)
-        if match:
-            self.addRead(read)
-            return True
-        else:
-            return False
         
     def matchKmer(self,read):
              
