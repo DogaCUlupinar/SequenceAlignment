@@ -154,17 +154,51 @@ class ReferenceSequence:
         
         #helper
         self.variations = dict()
+    
+    def readIn(self,filename):
+        #comeback to this
+        with open(filename) as f:
+            variations = f.readlines()
+            #try a begins with type thing
+            total = len(variations)
+            variation_type = None
+
+            for variation in variations:
+                #determine variation type
+                variation = variation.strip()    
+                if "SNP" in variation:
+                    variation_type = "SNP"
+                    continue
+                elif "INS" in variation:
+                    variation_type = "INS"
+                    continue
+                elif "DEL" in variation:
+                    variation_type = "DEL"
+                    continue
+                    
+                #now process the variaton types
+                if variation_type == "INS":
+                    ins,pos = variation.split(",")
+                    self.insertions.add((ins,int(pos)))
+                elif variation_type == "SNP":
+                    base,snp,pos = variation.split(",")
+                    self.SNP.add((base,snp,int(pos)))
+                elif variation_type == "DEL":
+                    dell,pos = variation.split(",")
+                    self.deletions.add((dell,int(pos)))
+                    
     def generateDonor(self):
+        logger.warn("generating donor")
         self.determineSNP()
         self.determineInDels()
+        logger.warn("determined everything")
         self.donor_seq = list(self.refRead)
         self.index_match  = np.linspace(0,len(self.refRead) -1,num=len(self.refRead),dtype=int) #key reference position value is position in ref
-       
+        
         
         for snp in self.SNP:
             self.donor_seq[snp[2]] = snp[1]
-        
-        
+                
         index_offset = 0
         match_offset = 0
         last_update = 0
@@ -190,6 +224,7 @@ class ReferenceSequence:
         """
         
         self.donor_seq = "".join(self.donor_seq)
+        logger.warn("done generating donor")
         return self.donor_seq
     
     def translateIndex(self,donor_index):
@@ -211,12 +246,12 @@ class ReferenceSequence:
         ii = 0
         dict_str = dict() #key is start pos, #val is string
         for key in all_kmer:
-            if ii % (len_dict/20) == 0:logger.warn("Checking the {0}th kmer".format(str(ii)))
+            if ii % (len_dict/100) == 0:logger.warn("Checking the {0}th kmer".format(str(ii)))
             ii+=1
             for m in re.finditer("({kmer}){{{rep},}}".format(kmer=key,rep=4-(len(key)-4)),self.donor_seq):
                 match_inref = self.translateIndex(m.start())
                 dict_str[match_inref] = m.group()
-               
+                
         sorted_d = sorted(dict_str.items(), key=operator.itemgetter(0))
         self.STR.add(sorted_d[0])
         
@@ -299,6 +334,7 @@ class ReferenceSequence:
                 self.variations[variation.pos] = [variation.var]
     
     def determineSNP(self,coverage = DEFAULT_COVERAGE):
+        logger.warn("determining SNP")
         for key in self.variations:
             snp = max(self.variations[key],key=self.variations[key].count)
             if self.variations[key].count(snp) >= coverage:
@@ -442,8 +478,8 @@ class ReferenceSequence:
         return False
     
     def printInfo(self,filestream=stdout):
-        self.determineSNP()
-        self.determineInDels()
+        #self.determineSNP()
+        #self.determineInDels()
         for attribute in self.attributes:
             filestream.write(str(attribute))
 
@@ -459,6 +495,7 @@ class ReferenceSequence:
         self.insertions.add((insertion,start))
     
     def determineInDels(self):
+        logger.warn("determining indel")
         self.INDEL = self.deletions | self.insertions
         remove = Set()
         for dely in self.deletions:

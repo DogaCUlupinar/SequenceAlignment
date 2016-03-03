@@ -18,7 +18,10 @@ logger.basicConfig(level=logger.WARNING,format='%(asctime)s %(message)s', datefm
 
 refReadFile = "../HW2lnx/hw2grad/ref_hw2grad_M_1_chr_1.txt"
 readPrefix = "../HW2lnx/hw2grad/reads/splitreads*"
-output = open("practice.txt",'w')  
+
+#refReadFile = "../HW2/practice_E_1/ref_practice_E_1_chr_1.txt"
+#readPrefix = "../HW2/practice_E_1/reads/splitreads*"
+output = open("FINAL_GRAD.txt",'w')  
 
 readFiles = [file for file in glob.glob(readPrefix)]
 
@@ -38,32 +41,43 @@ for readFile in readFiles:
         #read is a tuple
         i+=1
         if i % (len_unmatchedReads/10) == 0:
-            logger.warning("Process {0} has completed {1}% of read {2}".format(id,str(100*i/float(len_unmatchedReads)),read_count))
+            logger.warning("Process {0} has completed {1}% of read {2}".format(id,str(100*i/float(len_unmatchedReads)),1))
         
         found_read1 = refSeq.findMatch(read[0],kmerMap)
+        read1_reverse = False
         if found_read1 == False:
             found_read1 = refSeq.findMatch(read[0],kmerMap,reverse = True)
-                
+            read1_reverse = True
+               
+        read2_reverse = False
         found_read2 = refSeq.findMatch(read[1],kmerMap)                       
         if found_read2 == False:
             found_read2 = refSeq.findMatch(read[1],kmerMap,reverse = True)
-
+            read2_reverse = True
+    
         
-        #now we check for indels
-        
+        #now check indel
         if (bool(found_read1) ^ bool(found_read2)):
-            #only one was found
-        
-            if bool(found_read1) == True:
-                #The pairedEnd had a match So lets check within a close distance
+            paired_reads = []
+            if found_read1 == False:
+                if read2_reverse == False:
+                    check_read = read[0][::-1]
+                else:
+                    
+                    check_read = read[0]
+                start = found_read2  
+            if found_read2 == False:
+                if read1_reverse == False:
+                    check_read = read[1][::-1]
+                else:
+                    
+                    check_read = read[1]
                 start = found_read1
-                check_read = read[1]
-            else:
-                start = found_read2
-                check_read = read[0]
-                
             logger.debug("checking for indel between {0} and {1}".format(str(start),str(start+400)))
             refSeq.findInDels(check_read,start + 50,start + 250) #need to check 50 after start
             logger.debug("done checking for indel")
     read_count+=1
-refSeq.printInfo()
+donor = refSeq.generateDonor()
+refSeq.findSTRRegex() 
+refSeq.printInfo(output)
+

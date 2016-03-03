@@ -4,6 +4,7 @@ Created on Jan 8, 2016
 @author: dulupinar
 '''
 import sequencingtools.tools as tools
+import sys
 import numpy as np
 import os.path
 import cPickle as pickle
@@ -15,9 +16,8 @@ from _collections import defaultdict
 def reject_outliers(data, m=2):
     return data[abs(data - np.mean(data)) < m * np.std(data)]
 
-#refReadFile = "./forcredit/hw1_W_2/ref_hw1_W_2_chr_1.txt"
-#readFile = "./forcredit/hw1_W_2/reads_hw1_W_2_chr_1.txt"
-output = open("str_test_grad_write_g_cov.1000.txt",'w') 
+
+output = open("STR_FINAL_GRAD.txt",'w') 
 refReadFile = "../HW2/practice_E_1/ref_practice_E_1_chr_1.txt"
 readFile = "../HW2/practice_E_1/reads_practice_E_1_chr_1.txt"
 #refReadFile = "../HW2/hw2grad/ref_hw2grad_M_1_chr_1.txt"
@@ -30,10 +30,27 @@ tools.allKmerBetter(5, "", tools.alpha, all_kmer)
 unmatchedReads = tools.readRead(readFile)
 len_unmatchedReads = len(unmatchedReads)
 i = 0
-refSeq = tools.ReferenceSequence(refReadFile)
-kmerMap = tools.generateKmerMap(refSeq.refRead,50)
-    
+
+
+if True:
+    #grad version
+    refReadFile = "../HW2/hw2grad/ref_hw2grad_M_1_chr_1.txt"
+    refSeq = tools.ReferenceSequence(refReadFile)
+    refSeq.readIn("FINAL_GRAD.txt")
+    donor = refSeq.generateDonor()
+    refSeq.findSTRRegex() 
+    refSeq.printInfo(output)
+    sys.exit()
+elif False:
+    refSeq = tools.ReferenceSequence(refReadFile)  
+    refSeq.readIn("str_test_grad_write_g_cov.1000.txt")
+    donor = refSeq.generateDonor()
+    refSeq.findSTRRegex() 
+    refSeq.printInfo(output)
+    sys.exit()
 #####
+refSeq = tools.ReferenceSequence(refReadFile)  
+kmerMap = tools.generateKmerMap(refSeq.refRead,50)
 unmatchedReads = tools.readRead(readFile)
 i =0
 len_unmatchedReads = len(unmatchedReads)
