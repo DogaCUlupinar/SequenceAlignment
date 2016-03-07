@@ -35,8 +35,8 @@ i = 0
 if True:
     #grad version
     refReadFile = "../HW2/hw2grad/ref_hw2grad_M_1_chr_1.txt"
-    refSeq = tools.ReferenceSequence(refReadFile)
-    refSeq.readIn("FINAL_GRAD.txt")
+    refSeq = tools.ReferenceSequence("donorReadin.txt")
+    #refSeq.readIn("FINAL_GRAD.txt")
     donor = refSeq.generateDonor()
     refSeq.findSTRRegex() 
     refSeq.printInfo(output)

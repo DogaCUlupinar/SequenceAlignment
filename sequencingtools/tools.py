@@ -138,9 +138,15 @@ class ReferenceSequence:
             self.refRead = filename 
             self.name = "DEBUG"
         else:
-            fileContent = readRef(filename)
-            self.refRead = fileContent[0]
-            self.name = fileContent[1]
+            if "donor" in filename:
+                with open(filename) as f:
+                    self.refRead = f.readline().strip()
+                 
+                self.name = ">hw2grad_M_1_chr_1"
+            else:
+                fileContent = readRef(filename)
+                self.refRead = fileContent[0]
+                self.name = fileContent[1]
         
         #attributes
         self.STR = STR()
@@ -246,6 +252,7 @@ class ReferenceSequence:
         ii = 0
         dict_str = dict() #key is start pos, #val is string
         for key in all_kmer:
+            logger.warn("Checking the {0}th kmer".format(str(ii)))
             if ii % (len_dict/100) == 0:logger.warn("Checking the {0}th kmer".format(str(ii)))
             ii+=1
             for m in re.finditer("({kmer}){{{rep},}}".format(kmer=key,rep=4-(len(key)-4)),self.donor_seq):
@@ -361,10 +368,29 @@ class ReferenceSequence:
                         return startRef
         
         return False
+    def findInDelsEx(self,read,kmerMap,numBlocks=DEFAULT_NUM_BLOCKS,reverse=False):
+        if reverse:
+            read = read[::-1]
+        blockSize = len(read)/numBlocks
+        for explore_i in range(numBlocks):
+            #check if any block matches our preproccessed map
+            start = explore_i*blockSize
+            end = min(len(read),start+blockSize) #make better need to get read of len and min operators
+            block = read[start:end]
+            if kmerMap.has_key(block):
+                for posInRef in kmerMap[block]:
+                    #verify around each site where the block matches
+                    startRef = -explore_i*blockSize + posInRef
+                    endRef   = startRef + 150
+                    if self.findInDels(read,startRef,endRef):
+                        return True
+        
+        return False
     
     def findInDels(self,readObj,start_ref,end_ref):
         if self.findInsertions(readObj,start_ref,end_ref) == False:      
-            self.findDeletions(readObj,start_ref,end_ref)
+            found = self.findDeletions(readObj,start_ref,end_ref)
+            return found
         
     def findDeletions(self,read,start_ref,end_ref):
         refRead = self.refRead[start_ref:end_ref]
@@ -381,7 +407,7 @@ class ReferenceSequence:
             gap_size = 0
             gap_count = 0
             max_gap_count = 1
-            max_gap_size = 20
+            max_gap_size = 35
             match_previous = False
             gap_pos = None
             
@@ -436,7 +462,7 @@ class ReferenceSequence:
             gap_size = 0
             gap_count = 0
             max_gap_count = 1
-            max_gap_size = 20
+            max_gap_size = 35
             match_previous = False
             gap_pos = None
             last_match_index+=1
@@ -478,8 +504,8 @@ class ReferenceSequence:
         return False
     
     def printInfo(self,filestream=stdout):
-        #self.determineSNP()
-        #self.determineInDels()
+        self.determineSNP()
+        self.determineInDels()
         for attribute in self.attributes:
             filestream.write(str(attribute))
 

@@ -16,12 +16,16 @@ logger.basicConfig(level=logger.WARNING,format='%(asctime)s %(message)s', datefm
 #refReadFile = "/Users/dulupinar/Documents/UCLA/Classes/Winter16/CM222/HW2/practice_W_1/ref_practice_W_1_chr_1.txt"
 #readPrefix = "/Users/dulupinar/Documents/UCLA/Classes/Winter16/CM222/HW2/practice_W_1/reads/splitreads*"
 
-refReadFile = "../HW2lnx/hw2grad/ref_hw2grad_M_1_chr_1.txt"
-readPrefix = "../HW2lnx/hw2grad/reads/splitreads*"
+#refReadFile = "../HW2lnx/hw2grad/ref_hw2grad_M_1_chr_1.txt"
+#readPrefix = "../HW2lnx/hw2grad/reads/splitreads*"
 
-#refReadFile = "../HW2/practice_E_1/ref_practice_E_1_chr_1.txt"
-#readPrefix = "../HW2/practice_E_1/reads/splitreads*"
-output = open("FINAL_GRAD.txt",'w')  
+refReadFile = "../HW2/practice_E_1/ref_practice_E_1_chr_1.txt"
+readPrefix = "../HW2/practice_E_1/reads/splitreads*"
+
+#refReadFile = "../HW2/hw2undergrad_E_2/ref_hw2undergrad_E_2_chr_1.txt"
+#readPrefix = "../HW2/hw2undergrad_E_2/reads/splitreads*"
+
+output = open("ug_str_indel_practice.txt",'w')  
 
 readFiles = [file for file in glob.glob(readPrefix)]
 
@@ -75,9 +79,15 @@ for readFile in readFiles:
                 start = found_read1
             logger.debug("checking for indel between {0} and {1}".format(str(start),str(start+400)))
             refSeq.findInDels(check_read,start + 50,start + 250) #need to check 50 after start
-            logger.debug("done checking for indel")
+            logger.debug("done checking for indel")          
+        elif bool(found_read1) == False and bool(found_read2) == False:
+            if refSeq.findInDelsEx(read[0],kmerMap) == False:
+                refSeq.findInDelsEx(read[0],kmerMap,reverse=True)
+            if refSeq.findInDelsEx(read[1],kmerMap)== False:
+                refSeq.findInDelsEx(read[1],kmerMap,reverse=True)
+                
     read_count+=1
-donor = refSeq.generateDonor()
-refSeq.findSTRRegex() 
+#donor = refSeq.generateDonor()
+#refSeq.findSTRRegex()    
 refSeq.printInfo(output)
 
